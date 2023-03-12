@@ -118,6 +118,7 @@ type (
 		MinSize                float64    // Order's minimal size.
 		SizeIncrement          float64    // Order's size increment.
 		SuggestedSizeIncrement float64    // Order's suggested size increment.
+		DerivativeSecTypes     []string
 	}
 
 	TagValue struct {

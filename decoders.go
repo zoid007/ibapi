@@ -8,6 +8,42 @@ import (
 )
 
 // decodeRealTimeBars converts a RealTimeBars incoming message into a Bar
+
+func decodeSymbolSamples(fields []string) []ContractDetails {
+	scanner := &parser{fields[2:]}
+
+	n := scanner.readInt()
+	contractDescriptions := make([]ContractDetails, 0, n)
+
+	for ; n > 0; n-- {
+		cd := ContractDetails{}
+		cd.Contract.ContractId = scanner.readInt()
+		cd.Contract.Symbol = scanner.readString()
+		cd.Contract.SecurityType = scanner.readString()
+		cd.Contract.PrimaryExchange = scanner.readString()
+		cd.Contract.Currency = scanner.readString()
+		// sdtN := scanner.readInt()
+		// derivativeSecTypes := make([]string, 0, sdtN)
+		// for ; sdtN > 0; sdtN-- {
+		// 	derivativeSecType := scanner.readString()
+		// 	cd.UnderSecType = append(derivativeSecTypes, derivativeSecType)
+		// }
+		// fmt.Println(derivativeSecTypes)
+
+		sdtN := scanner.readInt()
+		cd.DerivativeSecTypes = make([]string, 0, sdtN)
+		for ; sdtN > 0; sdtN-- {
+			derivativeSecType := scanner.readString()
+			cd.DerivativeSecTypes = append(cd.DerivativeSecTypes, derivativeSecType)
+		}
+
+		contractDescriptions = append(contractDescriptions, cd)
+	}
+
+	// fmt.Println("destc: ", contractDescriptions[0])
+	return contractDescriptions
+}
+
 func decodeRealTimeBars(fields []string) Bar {
 	scanner := &parser{fields[3:]}
 

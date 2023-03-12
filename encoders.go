@@ -1,5 +1,26 @@
 package ibapi
 
+type reqMatchingSymbols struct {
+	serverVersion int
+	requestId     int
+
+	pattern string
+}
+
+func (e *reqMatchingSymbols) encode() string {
+
+	message := messageBuilder{}
+	message.addInt(requestMatchingSymbols)
+	message.addInt(e.requestId)
+	message.addString(e.pattern)
+
+	if e.serverVersion >= minServerVersionLinking {
+		// realtime bar options
+		message.addString("")
+	}
+	return message.Encode()
+}
+
 type realTimeBarsEncoder struct {
 	serverVersion int
 	version       int

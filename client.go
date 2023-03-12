@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	ibDateLayout  = "20060102 15:04:05 MST"
+	ibDateLayout  = "20060102 15:04:05 India Standard Time"
 	clientVersion = 2
 	noRequest     = -1
 )
@@ -44,9 +44,10 @@ type MessageBus interface {
 // Connect creates a socket connection to TWS/IBG.
 //
 // Parameters:
-// 	host 	- host to connect to
-// 	port 	- port to connect to
-// 	client 	- client id. can connect up to 32 clients
+//
+//	host 	- host to connect to
+//	port 	- port to connect to
+//	client 	- client id. can connect up to 32 clients
 func Connect(host string, port int, clientId int) (*IbClient, error) {
 	bus := TcpMessageBus{}
 	if err := bus.Connect(host, port, clientId); err != nil {
@@ -203,7 +204,7 @@ func getRequestId(msgId int, fields []string) int {
 	text := ""
 
 	switch msgId {
-	case contractData, tickByTick:
+	case contractData, tickByTick, symbolSample:
 		text = fields[1]
 	case contractDataEnd, realTimeBars:
 		text = fields[2]
@@ -262,9 +263,10 @@ func (c *IbClient) handleErrorMessage(scanner *parser, fields []string) {
 // Real time bars subscriptions are also included in the calculation of the number of Level 1 market data subscriptions allowed in an account.
 //
 // Parameters:
-// 	contract 	- the Contract for which the depth is being requested
-// 	whatToShow 	- TRADES, MIDPOINT, BID, ASK
-// 	useRth 		- use regular trading hours
+//
+//	contract 	- the Contract for which the depth is being requested
+//	whatToShow 	- TRADES, MIDPOINT, BID, ASK
+//	useRth 		- use regular trading hours
 func (c *IbClient) RealTimeBars(ctx context.Context, contract Contract, whatToShow string, useRth bool) (<-chan Bar, error) {
 	if c.ServerVersion < minServerVersionRealTimeBars {
 		return nil, stacktrace.NewError("server version %d does not support real time bars", c.ServerVersion)
@@ -565,6 +567,62 @@ func (c *IbClient) ContractDetails(ctx context.Context, contract Contract) ([]Co
 			}
 		}
 	}
+}
+
+func (c *IbClient) ReqMatchingSymbols(ctx context.Context, pattern string) ([]ContractDetails, error) {
+	if c.ServerVersion < minServerVersionRealTimeBars {
+		return nil, stacktrace.NewError("server version %d does not support real time bars", c.ServerVersion)
+	}
+
+	if c.ServerVersion < minServerVersionTradingClass {
+		return nil, stacktrace.NewError("server version %d does not support TradingClass or ContractId fields", c.ServerVersion)
+	}
+
+	encoder := reqMatchingSymbols{
+		serverVersion: c.ServerVersion,
+		requestId:     c.nextRequestId(),
+		pattern:       pattern,
+	}
+
+	messages := c.addChannel(encoder.requestId)
+
+	err := c.MessageBus.WritePacket(encoder.encode())
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "error sending request matching symbol")
+	}
+
+	// process response
+
+	contracts := []ContractDetails{}
+
+	for {
+		select {
+		case <-ctx.Done():
+			// c.cancelRealTimeBars(ctx, encoder.requestId)
+			// c.removeChannel(encoder.requestId)
+			// close(bars)
+
+		case message := <-messages:
+			if message == nil {
+				return contracts, nil
+			}
+
+			messageId, err := strconv.Atoi(message[0])
+			if err != nil {
+				log.Printf("error parsing messageId [%s]: %v", message[0], err)
+			}
+
+			if messageId == symbolSample {
+				contracts := decodeSymbolSamples(message)
+				// contracts = append(contracts, contract)
+				return contracts, nil
+
+			} else {
+				log.Printf("unexpected message: %v", message)
+			}
+		}
+	}
+
 }
 
 // Utility Methods
