@@ -1,4 +1,4 @@
-module github.com/wboayue/ibapi
+module github.com/zoid007/ibapi
 
 go 1.17
 
